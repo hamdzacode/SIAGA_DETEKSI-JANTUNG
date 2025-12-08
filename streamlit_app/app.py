@@ -105,6 +105,77 @@ if "user_id" not in st.session_state: st.session_state.user_id = 1
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 
 # --- LOGIC ACTIONS ---
+
+# Visualization Helpers (Restored)
+def create_gauge_chart(value, title):
+    color = "green"
+    if value >= 30: color = "orange"
+    if value >= 60: color = "red"
+    
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number",
+        value = value,
+        domain = {'x': [0, 1], 'y': [0, 1]},
+        title = {'text': title, 'font': {'size': 18, 'color': '#2c3e50'}},
+        number = {'suffix': "%", 'font': {'color': color}},
+        gauge = {
+            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "#333"},
+            'bar': {'color': color},
+            'bgcolor': "white",
+            'borderwidth': 2,
+            'bordercolor': "#eee",
+            'steps': [
+                {'range': [0, 30], 'color': "#e8f5e9"},
+                {'range': [30, 60], 'color': "#fff3e0"},
+                {'range': [60, 100], 'color': "#ffebee"}],
+            'threshold': {
+                'line': {'color': "red", 'width': 4},
+                'thickness': 0.75,
+                'value': value}}))
+    fig.update_layout(height=250, margin=dict(l=20, r=20, t=40, b=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+    return fig
+
+def create_radar_chart(input_data):
+    # Normalize values to 0-1 scale for visualization where 1 is "Bad/High Risk"
+    categories = ['BMI', 'Tekanan Darah (MAP)', 'Kolesterol', 'Glukosa', 'Gaya Hidup']
+    
+    # Logic normalization (Simplified)
+    norm_bmi = min(max((input_data['bmi'] - 18.5) / (35 - 18.5), 0), 1)
+    norm_map = min(max((input_data['map'] - 70) / (130 - 70), 0), 1)
+    norm_chol = (input_data['cholesterol'] - 1) / 2
+    norm_gluc = (input_data['gluc'] - 1) / 2
+    
+    # Lifestyle score: Smoke(1) + Alco(1) + Inactive(1) -> Max 3
+    lifestyle_score = input_data['smoke'] + input_data['alco'] + (1 - input_data['active'])
+    norm_lifestyle = min(lifestyle_score / 3, 1)
+    
+    values = [norm_bmi, norm_map, norm_chol, norm_gluc, norm_lifestyle]
+    
+    fig = go.Figure()
+    fig.add_trace(go.Scatterpolar(
+        r=values,
+        theta=categories,
+        fill='toself',
+        name='Profil Pasien',
+        line_color='#3498db',
+        fillcolor='rgba(52, 152, 219, 0.2)'
+    ))
+    
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[0, 1],
+                showticklabels=False
+            )),
+        showlegend=False,
+        height=300,
+        margin=dict(l=40, r=40, t=20, b=20),
+        paper_bgcolor='rgba(0,0,0,0)',
+        title=dict(text="Peta Faktor Risiko", x=0.5, y=0.95, font=dict(size=14))
+    )
+    return fig
+
 def perform_analysis(p, age_years, bmi, map_val, chol_map, gluc_map, chol, gluc, smoke, alco, active):
     try:
         # Load Model
@@ -391,8 +462,20 @@ elif menu == "Pasien":
                 c3.metric("MAP (Tekanan Darah)", f"{last['map']:.0f}")
                 
                 if 'created_at' in df_hist.columns:
-                    fig = px.line(df_hist, x='created_at', y='probability', title="Tren Risiko")
-                    st.plotly_chart(fig, use_container_width=True)
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.markdown("##### <i class='fa-solid fa-chart-line'></i> Tren Risiko", unsafe_allow_html=True)
+                        fig_risk = px.area(df_hist, x='created_at', y='probability', markers=True)
+                        fig_risk.update_traces(line_color='#ef4444', fillcolor='rgba(239, 68, 68, 0.1)')
+                        fig_risk.update_layout(height=300, margin=dict(l=0,r=0,t=0,b=0), xaxis_title=None, yaxis_title=None)
+                        st.plotly_chart(fig_risk, use_container_width=True)
+                    
+                    with c2:
+                        st.markdown("##### <i class='fa-solid fa-heart-pulse'></i> Tren Tekanan Darah", unsafe_allow_html=True)
+                        fig_map = px.line(df_hist, x='created_at', y='map', markers=True)
+                        fig_map.update_traces(line_color='#3b82f6', line_width=3)
+                        fig_map.update_layout(height=300, margin=dict(l=0,r=0,t=0,b=0), xaxis_title=None, yaxis_title=None)
+                        st.plotly_chart(fig_map, use_container_width=True)
                 
                 st.info(f"Rekomendasi:\n{last['recommendations']}")
             else:
@@ -434,39 +517,40 @@ elif menu == "Pasien":
                         
                         if res:
                             st.toast("Analisis Selesai!", icon="✅")
-                            st.markdown("### 📊 Hasil Analisis Saat Ini")
+                            st.markdown("### 📊 Hasil Analisis")
                             
                             # Visual Results
-                            r1, r2 = st.columns(2)
+                            r1, r2 = st.columns([1, 1])
                             with r1:
-                                # Gauge-like display using metric and progress
-                                risk_color = "green" if res['risk_category'] == "Rendah" else "orange" if res['risk_category'] == "Sedang" else "red"
-                                st.metric("Probabilitas Risiko", f"{res['probability']:.1%}", res['risk_category'])
-                                st.progress(res['probability'])
-                                st.caption(f"Kategori: **{res['risk_category']}**")
+                                # GAUGE CHART (Restored)
+                                prob_val = res['probability'] * 100
+                                st.plotly_chart(create_gauge_chart(prob_val, "Probabilitas Risiko"), use_container_width=True)
                                 
                             with r2:
-                                # Recommendations
-                                st.markdown("#### Rekomendasi Medis")
-                                st.info(res['recommendations'])
+                                # SHAP / RADAR
+                                if res.get('shap_values'):
+                                    try:
+                                        shap_data = json.loads(res['shap_values'])
+                                        if shap_data:
+                                            # Sort by absolute impact
+                                            sorted_shap = sorted(shap_data.items(), key=lambda x: abs(x[1]), reverse=True)
+                                            # Convert to DF for chart
+                                            shap_df = pd.DataFrame(sorted_shap, columns=['Faktor', 'Impact'])
+                                            
+                                            # Nice Bar Chart for SHAP (Like before)
+                                            fig_shap = px.bar(shap_df, x='Impact', y='Faktor', orientation='h',
+                                                            title="Faktor Penentu (SHAP)",
+                                                            color='Impact', color_continuous_scale=['#2ecc71', '#e74c3c'])
+                                            fig_shap.update_layout(height=280, margin=dict(l=0,r=0,t=30,b=0), showlegend=False)
+                                            st.plotly_chart(fig_shap, use_container_width=True)
+                                    except:
+                                        # Fallback to Radar if SHAP fails or empty
+                                        pass
                             
-                            # SHAP if available
-                            if res.get('shap_values'):
-                                try:
-                                    shap_data = json.loads(res['shap_values'])
-                                    if shap_data:
-                                        st.markdown("#### Faktor Kontribusi Utama")
-                                        # Sort by absolute impact
-                                        sorted_shap = sorted(shap_data.items(), key=lambda x: abs(x[1]), reverse=True)
-                                        # Take top 3
-                                        for k, v in sorted_shap:
-                                            kn = k.replace("age_years", "Usia").replace("bmi", "BMI").replace("map", "Tekanan Darah")
-                                            impact = "Meningkatkan Risiko ⬆️" if v > 0 else "Menurunkan Risiko ⬇️"
-                                            color = "red" if v > 0 else "green"
-                                            st.markdown(f"- **{kn}**: :{color}[{impact}]")
-                                except:
-                                    pass
-                                    
+                            # Recommendations
+                            st.markdown("#### Rekomendasi Medis")
+                            st.info(res['recommendations'])
+                                
                             st.button("🔄 Reset / Analisis Ulang", on_click=lambda: st.rerun())
 
         with tab3:
