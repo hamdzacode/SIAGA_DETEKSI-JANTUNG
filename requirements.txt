@@ -11,3 +11,4 @@ sqlalchemy
 requests
 plotly
 streamlit-option-menu
+shap
