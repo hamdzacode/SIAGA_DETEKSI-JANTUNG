@@ -76,9 +76,7 @@ st.markdown("""
     /* Global Clean Aesthetic */
     html, body, [class*="css"] { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: #1e293b; }
     .stApp { 
-        background-color: #f8fafc;
-        background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
-        background-size: 20px 20px;
+        background-color: #f8fafc; 
     }
     
     /* Main Layout Padding Adjustment */
@@ -97,56 +95,59 @@ st.markdown("""
     
     /* Glassy/Card Metrics */
     .metric-card {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(10px);
+        background: white;
         border-radius: 16px; 
         padding: 24px;
-        border: 1px solid #f1f5f9; 
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid #e2e8f0; 
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        transition: all 0.2s;
         position: relative; 
         overflow: hidden;
     }
     .metric-card:hover { 
-        transform: translateY(-4px); 
-        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); 
+        transform: translateY(-2px); 
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); 
         border-color: #3b82f6;
     }
     .metric-card::before { 
         content: ""; position: absolute; top: 0; left: 0; width: 6px; height: 100%; 
-        background: linear-gradient(to bottom, #3b82f6, #60a5fa); 
+        background: #3b82f6; 
     }
     .metric-value { font-size: 36px; font-weight: 800; color: #0f172a; margin: 4px 0; letter-spacing: -0.02em; }
     .metric-label { font-size: 14px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
     
     /* Modern Tabs */
     .stTabs [data-baseweb="tab-list"] { 
-        gap: 8px; border-bottom: none; margin-bottom: 24px; padding: 4px;
-        background: #f1f5f9; border-radius: 12px; display: inline-flex;
+        gap: 8px; border-bottom: none; margin-bottom: 24px;
     }
     .stTabs [data-baseweb="tab"] { 
-        height: 40px; border-radius: 10px; color: #64748b; font-weight: 600; border: none; padding: 0 20px;
-        background: transparent;
+        height: 40px; border-radius: 8px; color: #64748b; font-weight: 600; border: none; padding: 0 20px;
+        background-color: transparent;
     }
     .stTabs [aria-selected="true"] { 
-        color: #2563eb; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        color: #2563eb; background-color: #eff6ff;
+    }
+    .stTabs [data-baseweb="tab-highlight"] {
+        display: none;
     }
     
     /* Buttons */
     .stButton > button { 
-        border-radius: 10px; font-weight: 600; border: none;
+        border-radius: 10px; font-weight: 600; border: none !important;
         transition: all 0.2s;
     }
     div[data-testid="stFormSubmitButton"] > button {
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        background: #2563eb;
         color: white;
-        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
         width: 100%;
         padding: 0.75rem 0;
+        border: none !important;
+        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
     }
     div[data-testid="stFormSubmitButton"] > button:hover {
-        transform: scale(1.01);
-        box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+        background: #1d4ed8;
+        transform: translateY(-1px);
+        box-shadow: 0 8px 12px -3px rgba(37, 99, 235, 0.3);
     }
 
     /* Custom Alert Boxes */
