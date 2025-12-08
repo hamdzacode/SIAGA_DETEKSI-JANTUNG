@@ -1,0 +1,13 @@
+pandas
+numpy
+scikit-learn
+xgboost
+imbalanced-learn
+joblib
+streamlit
+fastapi
+uvicorn
+sqlalchemy
+requests
+plotly
+streamlit-option-menu
