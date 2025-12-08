@@ -71,31 +71,83 @@ st.set_page_config(
 # --- Custom CSS ---
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; color: #1e293b; }
-    .stApp { background-color: #f1f5f9; }
-    section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #e2e8f0; }
-    
-    .metric-card {
-        background-color: white; border-radius: 12px; padding: 24px;
-        border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-        transition: all 0.2s; position: relative; overflow: hidden;
+    /* Global Clean Aesthetic */
+    html, body, [class*="css"] { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: #1e293b; }
+    .stApp { 
+        background-color: #f8fafc;
+        background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+        background-size: 20px 20px;
     }
-    .metric-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
-    .metric-card::before { content: ""; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #3b82f6; }
-    .metric-value { font-size: 32px; font-weight: 700; color: #0f172a; margin: 8px 0; }
-    .metric-label { font-size: 13px; color: #64748b; font-weight: 600; text-transform: uppercase; }
-    .metric-sub { font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 4px; }
     
-    /* Tabs & Buttons */
-    .stTabs [data-baseweb="tab-list"] { gap: 24px; border-bottom: 1px solid #e2e8f0; }
-    .stTabs [data-baseweb="tab"] { height: 50px; border-radius: 0; color: #64748b; font-weight: 500; }
-    .stTabs [aria-selected="true"] { color: #3b82f6; border-bottom: 2px solid #3b82f6; }
-    .stButton > button { border-radius: 8px; font-weight: 600; border: none; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); }
+    /* Premium Sidebar */
+    section[data-testid="stSidebar"] { 
+        background-color: #ffffff; 
+        border-right: 1px solid #e2e8f0;
+        box-shadow: 4px 0 24px rgba(0,0,0,0.02);
+    }
     
-    .login-container { display: flex; justify-content: center; align-items: center; height: 100vh; }
+    /* Glassy/Card Metrics */
+    .metric-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 16px; 
+        padding: 24px;
+        border: 1px solid #f1f5f9; 
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative; 
+        overflow: hidden;
+    }
+    .metric-card:hover { 
+        transform: translateY(-4px); 
+        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); 
+        border-color: #3b82f6;
+    }
+    .metric-card::before { 
+        content: ""; position: absolute; top: 0; left: 0; width: 6px; height: 100%; 
+        background: linear-gradient(to bottom, #3b82f6, #60a5fa); 
+    }
+    .metric-value { font-size: 36px; font-weight: 800; color: #0f172a; margin: 4px 0; letter-spacing: -0.02em; }
+    .metric-label { font-size: 14px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+    
+    /* Modern Tabs */
+    .stTabs [data-baseweb="tab-list"] { 
+        gap: 8px; border-bottom: none; margin-bottom: 24px; padding: 4px;
+        background: #f1f5f9; border-radius: 12px; display: inline-flex;
+    }
+    .stTabs [data-baseweb="tab"] { 
+        height: 40px; border-radius: 10px; color: #64748b; font-weight: 600; border: none; padding: 0 20px;
+        background: transparent;
+    }
+    .stTabs [aria-selected="true"] { 
+        color: #2563eb; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    /* Buttons */
+    .stButton > button { 
+        border-radius: 10px; font-weight: 600; border: none;
+        transition: all 0.2s;
+    }
+    div[data-testid="stFormSubmitButton"] > button {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        color: white;
+        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+        width: 100%;
+        padding: 0.75rem 0;
+    }
+    div[data-testid="stFormSubmitButton"] > button:hover {
+        transform: scale(1.01);
+        box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+    }
+
+    /* Custom Alert Boxes */
+    div[data-testid="stAlert"] {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
 </style>
 """, unsafe_allow_html=True)
 
