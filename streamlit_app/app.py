@@ -413,9 +413,23 @@ elif menu == "Laporan":
     for c in all_checkups:
         # Simple dict conversion
         d = {k: v for k, v in c.__dict__.items() if not k.startswith('_')}
-        data_list.append(d)
         
+        # Add Patient Info (Lazy load from relationship)
+        if c.patient:
+            d['Nama Pasien'] = c.patient.full_name
+            d['No RM'] = c.patient.medical_record_number
+        else:
+            d['Nama Pasien'] = "Unknown"
+            d['No RM'] = "-"
+            
+        data_list.append(d)
+    
     df = pd.DataFrame(data_list)
+    
+    # Reorder columns
+    if not df.empty and 'Nama Pasien' in df.columns:
+        cols = ['Nama Pasien', 'No RM'] + [col for col in df.columns if col not in ['Nama Pasien', 'No RM']]
+        df = df[cols]
     
     if not df.empty:
         st.dataframe(df)
@@ -584,3 +598,32 @@ elif menu == "Pasien":
                 st.dataframe(df_hist[valid_cols])
             else:
                 st.info("Kosong.")
+
+elif menu == "Bantuan":
+    st.markdown("### 📖 Panduan Penggunaan Sistem")
+    
+    with st.expander("1. Manajemen Pasien", expanded=True):
+        st.markdown("""
+        - **Pencarian**: Gunakan kolom pencarian di Sidebar untuk mencari pasien berdasarkan Nama atau Nomor Rekam Medis (MRN).
+        - **Pendaftaran**: Jika pasien belum ada, buka menu "Daftar Pasien Baru" di Sidebar, isi formulir, dan klik Simpan.
+        - **Status**: Pasien yang dipilih akan muncul di atas (Header Biru) dengan detail lengkap.
+        """)
+        
+    with st.expander("2. Melakukan Pemeriksaan (Analisis AI)", expanded=True):
+        st.markdown("""
+        1. Pilih menu **Pasien** -> Tab **Pemeriksaan Baru**.
+        2. Masukkan data klinis pasien (Tinggi, Berat, Tensi, Hasil Lab).
+        3. Klik tombol **Analisis**. Sistem akan memproses data menggunakan model *Machine Learning*.
+        4. **Interpretasi Hasil**:
+           - **Gauge Chart** (Kiri): Menunjukkan *probability* atau kemungkinan risiko penyakit jantung (0-100%).
+           - **Radar Chart** (Kanan): Menunjukkan peta profil pasien. Area yang melebar ke luar menunjukkan faktor risiko dominan (misal: Gaya Hidup buruk atau Tensi tinggi).
+           - **Rekomendasi**: Ikuti saran medis yang muncul secara otomatis.
+        """)
+        
+    with st.expander("3. Laporan & Ekspor Data"):
+        st.markdown("""
+        - **Download CSV**: Anda dapat mengunduh seluruh data pemeriksaan di menu **Laporan**. File CSV kini menyertakan Nama Pasien dan No RM untuk memudahkan administrasi.
+        - **Riwayat Pasien**: Untuk mengunduh riwayat **satu pasien saja**, buka menu Pasien -> Tab Riwayat -> Unduh Riwayat.
+        """)
+        
+    st.info("💡 Sistem ini menggunakan model XGBoost yang dilatih pada dataset kardiovaskular standar. Gunakan hasil sebagai pendukung keputusan klinis, bukan pengganti diagnosis dokter.")
