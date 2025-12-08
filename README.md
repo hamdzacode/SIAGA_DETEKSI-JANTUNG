@@ -80,7 +80,33 @@ streamlit run streamlit_app/app.py
     ```
 3.  Di Dashboard Streamlit Cloud, klik **Reboot App** untuk menarik perubahan terbaru.
 
-## 4. Pengembangan Lanjutan (Next Phase)
+## 4. Spesifikasi Model & Versi
+Transparansi algoritma dan pembaruan sistem.
+
+### Tentang Model (Human-Developed AI)
+Sistem ini menggunakan algoritma **XGBoost (Extreme Gradient Boosting)**, sebuah teknik *Supervised Learning* yang dilatih oleh manusia menggunakan dataset kardiovaskular klinis (70.000+ data pasien).
+
+-   **Tipe Model**: Binary Classification (Sehat vs Berisiko).
+-   **Akurasi Pengujian**: ~73% - 75% (Pada Dataset Validasi Standar).
+-   **Fitur Input**: Usia, Gender, BMI, Tekanan Darah (MAP), Kolesterol, Glukosa, Gaya Hidup.
+-   **Sifat alat**: *Clinical Decision Support System (CDSS)*.
+    > **Penting**: Hasil prediksi adalah perhitungan matematis berdasarkan pola data. Wajib divalidasi oleh diagnosa dokter profesional.
+
+### Riwayat Versi (Changelog)
+
+#### **App v2.2 (Current Cloud Release)**
+-   **Update**: Refaktor total ke Arsitektur Monolith (Streamlit Only) untuk stabilitas Cloud.
+-   **Fitur Baru**:
+    -   Login Admin & Manajemen Pasien.
+    -   Visualisasi Lanjut (Radar Chart & Gauge Chart).
+    -   Laporan dengan Identitas Pasien (Nama & MRN).
+    -   Integrasi Penjelasan AI (SHAP) untuk transparansi prediksi.
+
+#### **Model v1.0 (Monolith Optimized)**
+-   Dikompilasi ulang agar kompatibel dengan lingkungan Cloud tanpa GPU.
+-   Optimasi ukuran file (`.joblib`) untuk *loading* cepat.
+
+## 5. Pengembangan Lanjutan (Next Phase)
 Untuk fase selanjutnya, pertimbangkan hal berikut:
 - **Database**: Migrasi dari SQLite ke PostgreSQL (Supabase/Neon) untuk data persisten di Cloud.
 - **Auth**: Implementasi JWT atau Auth0 jika user bertambah banyak.
