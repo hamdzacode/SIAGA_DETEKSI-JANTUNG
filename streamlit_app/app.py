@@ -81,6 +81,13 @@ st.markdown("""
         background-size: 20px 20px;
     }
     
+    /* Main Layout Padding Adjustment */
+    .block-container {
+        padding-top: 2rem !important;
+        padding-bottom: 2rem !important;
+        max-width: 95% !important; 
+    }
+    
     /* Premium Sidebar */
     section[data-testid="stSidebar"] { 
         background-color: #ffffff; 
