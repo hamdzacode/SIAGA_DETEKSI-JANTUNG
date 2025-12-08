@@ -23,6 +23,29 @@ from ml.cardio_model import CardioRiskModel
 # Initialize DB
 models.Base.metadata.create_all(bind=engine)
 
+# --- SEED ADMIN USER (For Fresh DB) ---
+def seed_admin():
+    db = SessionLocal()
+    try:
+        user = db.query(models.User).filter(models.User.email == "admin@admin.com").first()
+        if not user:
+            # Create default admin
+            admin_user = models.User(
+                email="admin@admin.com",
+                name="Administrator",
+                password_hash="hashed_secret", # In real app use hash, here simplified as we check hardcoded pass in Login View
+                role="ADMIN"
+            )
+            db.add(admin_user)
+            db.commit()
+            print("Admin user seeded.")
+    except Exception as e:
+        print(f"Seeding ignored: {e}")
+    finally:
+        db.close()
+
+seed_admin()
+
 # --- DB HELPERS ---
 def get_db():
     db = SessionLocal()
