@@ -405,24 +405,26 @@ elif menu == "Laporan":
     st.title("Laporan Data")
     
     db = SessionLocal()
-    all_checkups = crud.get_all_checkups(db)
-    db.close()
-    
-    # Convert SQLAlchemy objects to Dict/DataFrame via Pydantic schema or direct dict
-    data_list = []
-    for c in all_checkups:
-        # Simple dict conversion
-        d = {k: v for k, v in c.__dict__.items() if not k.startswith('_')}
+    try:
+        all_checkups = crud.get_all_checkups(db)
         
-        # Add Patient Info (Lazy load from relationship)
-        if c.patient:
-            d['Nama Pasien'] = c.patient.full_name
-            d['No RM'] = c.patient.medical_record_number
-        else:
-            d['Nama Pasien'] = "Unknown"
-            d['No RM'] = "-"
+        # Convert SQLAlchemy objects to Dict/DataFrame via Pydantic schema or direct dict
+        data_list = []
+        for c in all_checkups:
+            # Simple dict conversion
+            d = {k: v for k, v in c.__dict__.items() if not k.startswith('_')}
             
-        data_list.append(d)
+            # Add Patient Info (Lazy load from relationship - Safe here because session is open)
+            if c.patient:
+                d['Nama Pasien'] = c.patient.full_name
+                d['No RM'] = c.patient.medical_record_number
+            else:
+                d['Nama Pasien'] = "Unknown"
+                d['No RM'] = "-"
+                
+            data_list.append(d)
+    finally:
+        db.close()
     
     df = pd.DataFrame(data_list)
     
