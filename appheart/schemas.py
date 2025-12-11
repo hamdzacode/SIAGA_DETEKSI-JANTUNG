@@ -17,7 +17,7 @@ class User(UserBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --- Patient ---
 class PatientBase(BaseModel):
@@ -38,7 +38,7 @@ class Patient(PatientBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --- Checkup ---
 class CheckupBase(BaseModel):
@@ -69,4 +69,4 @@ class Checkup(CheckupBase):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
