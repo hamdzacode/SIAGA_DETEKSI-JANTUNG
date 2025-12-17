@@ -3,6 +3,14 @@ from typing import Dict
 
 import joblib
 import numpy as np
+import sklearn.utils.validation
+
+# Monkey patch for scikit-learn >= 1.6 compatibility
+# Fixes: ImportError: cannot import name '_is_pandas_df' from 'sklearn.utils.validation'
+if not hasattr(sklearn.utils.validation, "_is_pandas_df"):
+    def _is_pandas_df(X):
+        return hasattr(X, "dtypes") and hasattr(X, "columns")
+    sklearn.utils.validation._is_pandas_df = _is_pandas_df
 
 # Lokasi file model (pipeline XGBoost) yang sudah Anda train sebelumnya.
 MODEL_PATH = Path(__file__).resolve().parent / "best_xgb_pipeline.joblib"
@@ -15,12 +23,22 @@ class CardioRiskModel:
     ['age_years','gender','bmi','map','cholesterol','gluc','smoke','alco','active']
     """
 
-    _instance = None  # singleton sederhana agar model hanya dimuat sekali
+    _instance = None
+    _init_success = False
 
     def __new__(cls, *args, **kwargs):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._load_model()
+        if cls._instance is None or not cls._init_success:
+            # Create a new instance
+            instance = super().__new__(cls)
+            try:
+                instance._load_model()
+                cls._instance = instance
+                cls._init_success = True
+            except Exception as e:
+                # If loading fails, do not save instance
+                cls._instance = None
+                cls._init_success = False
+                raise e
         return cls._instance
 
     def _load_model(self) -> None:

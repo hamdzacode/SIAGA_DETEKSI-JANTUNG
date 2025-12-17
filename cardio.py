@@ -1,6 +1,13 @@
 import pandas as pd
 import numpy as np
 import joblib
+import sklearn.utils.validation
+
+# Monkey patch for scikit-learn >= 1.6 compatibility
+if not hasattr(sklearn.utils.validation, "_is_pandas_df"):
+    def _is_pandas_df(X):
+        return hasattr(X, "dtypes") and hasattr(X, "columns")
+    sklearn.utils.validation._is_pandas_df = _is_pandas_df
 from xgboost import XGBClassifier
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.pipeline import Pipeline

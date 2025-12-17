@@ -48,6 +48,25 @@ def create_patient(db: Session, patient: schemas.PatientCreate):
     db.refresh(db_patient)
     return db_patient
 
+def update_patient(db: Session, patient_id: int, patient_data: schemas.PatientCreate):
+    db_patient = db.query(models.Patient).filter(models.Patient.id == patient_id).first()
+    if db_patient:
+        for key, value in patient_data.dict().items():
+            setattr(db_patient, key, value)
+        db.commit()
+        db.refresh(db_patient)
+    return db_patient
+
+def delete_patient(db: Session, patient_id: int):
+    db_patient = db.query(models.Patient).filter(models.Patient.id == patient_id).first()
+    if db_patient:
+        # Cascade delete related checkups if necessary, or let DB handle it. 
+        # Assuming simple delete for now.
+        db.delete(db_patient)
+        db.commit()
+        return True
+    return False
+
 # --- Checkup ---
 def create_checkup(db: Session, checkup: schemas.CheckupCreate, patient_id: int, probability: float, risk_label: int, risk_category: str, model_version: str, recommendations: str = None, shap_values: str = None):
     db_checkup = models.Checkup(

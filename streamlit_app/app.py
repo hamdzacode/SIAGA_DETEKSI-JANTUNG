@@ -18,7 +18,8 @@ sys.path.append(parent_dir)
 # --- DIRECT IMPORTS (No API) ---
 from appheart.database import SessionLocal, engine
 from appheart import crud, models, schemas
-from sqlalchemy import or_  # Added for direct search
+from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from ml.cardio_model import CardioRiskModel
 
 # Initialize DB
@@ -60,7 +61,7 @@ try:
     icon_path = os.path.join(parent_dir, "assets", "heart.png")
     icon = Image.open(icon_path)
 except:
-    icon = "🫀"
+    icon = ":material/cardiology:"
 
 st.set_page_config(
     page_title="SIAGA Jantung Pro",
@@ -285,7 +286,7 @@ def perform_analysis(p, age_years, bmi, map_val, chol_map, gluc_map, chol, gluc,
             
         if smoke: recs.append("🚭 **STOP MEROKOK**: Wajib program berhenti merokok.")
         if bmi >= 30: recs.append("⚖️ **BERAT BADAN**: Rujuk Ahli Gizi (Target turun 5-10%).")
-        if map_val > 105: recs.append("🩺 **HIPERTENSI**: Monitoring tekanan darah harian.")
+        if map_val > 105: recs.append(":material/blood_pressure: **HIPERTENSI**: Monitoring tekanan darah harian.")
         if chol_map[chol] >= 3: recs.append("🍔 **KOLESTEROL**: Diet rendah lemak jenuh.")
         if gluc_map[gluc] >= 3: recs.append("🍬 **DIABETES**: Cek HbA1c.")
         
@@ -337,7 +338,7 @@ def login_page():
         try:
             st.image(icon, width=100)
         except:
-            st.title("🫀")
+            st.title(":material/cardiology:")
             
         st.title("Admin Login")
         st.caption("Masuk untuk mengakses Dashboard SIAGA Jantung (Monolith Mode)")
@@ -350,7 +351,7 @@ def login_page():
             if submit:
                 if username.lower().strip() == "admin@admin.com" and password == "ADMIN123":
                     st.session_state.logged_in = True
-                    st.toast("Login Berhasil!", icon="🔓")
+                    st.toast("Login Berhasil!", icon=":material/lock_open:")
                     time.sleep(0.5)
                     st.rerun()
                 else:
@@ -369,7 +370,7 @@ with st.sidebar:
     try:
         st.image(icon, width=70)
     except:
-        st.header("🫀")
+        st.header(":material/cardiology:")
     st.markdown("### SIAGA Jantung")
     st.caption("v2.2 (Cloud Ready)")
     st.divider()
@@ -440,9 +441,11 @@ with st.sidebar:
                         )
                         new_p = crud.create_patient(db, p_create)
                         st.session_state.selected_patient = new_p.__dict__
-                        st.toast("Pasien berhasil didaftarkan!", icon="✅")
+                        st.toast("Pasien berhasil didaftarkan!", icon=":material/check_circle:")
                         time.sleep(1)
                         st.rerun()
+                    except IntegrityError:
+                        st.error(f"Nomor Rekam Medis '{new_mrn}' sudah terdaftar. Mohon gunakan nomor lain.", icon=":material/error:")
                     except Exception as e:
                         st.error(f"Gagal: {e}")
                     finally:
@@ -517,28 +520,235 @@ elif menu == "Laporan":
     
     # Reorder columns
     if not df.empty and 'Nama Pasien' in df.columns:
-        cols = ['Nama Pasien', 'No RM'] + [col for col in df.columns if col not in ['Nama Pasien', 'No RM']]
+        cols = ['Nama Pasien', 'No RM'] + [col for col in df.columns if col not in ['Nama Pasien', 'No RM', 'shap_values', 'recommendations']]
         df = df[cols]
     
     if not df.empty:
-        st.dataframe(df)
+        # --- Filters ---
+        st.markdown("### :material/search: Filter Data")
+        fc1, fc2 = st.columns([2, 1])
+        with fc1:
+            search_term = st.text_input("Cari Nama / No RM", placeholder="Ketik untuk mencari...")
+        with fc2:
+            filter_risk = st.multiselect("Kategori Risiko", ["Rendah", "Sedang", "Tinggi"], default=[])
+
+        # Apply Search
+        if search_term:
+            df = df[
+                df['Nama Pasien'].str.contains(search_term, case=False, na=False) | 
+                df['No RM'].str.contains(search_term, case=False, na=False)
+            ]
+            
+        # Apply Filter
+        if filter_risk:
+            df = df[df['risk_category'].isin(filter_risk)]
+            
+        st.markdown(f"**Menampilkan {len(df)} data**")
+        st.dataframe(df, use_container_width=True)
         csv = df.to_csv(index=False).encode('utf-8')
         date_str = datetime.now().strftime("%Y%m%d")
-        st.download_button("📥 Unduh Laporan Lengkap (.csv)", csv, f"Laporan_Klinik_{date_str}.csv", "text/csv", type="primary")
+        st.download_button("Unduh Laporan Lengkap (.csv)", csv, f"Laporan_Klinik_{date_str}.csv", "text/csv", icon=":material/download:", type="primary")
     else:
         st.info("Belum ada data.")
 
-elif menu == "Pasien":
+@st.dialog("Edit Data Pasien")
+def edit_patient_dialog(p_dict):
+    with st.form("edit_patient_form"):
+        new_name = st.text_input("Nama Lengkap", value=p_dict['full_name'])
+        new_dob = st.date_input("Tanggal Lahir", value=datetime.strptime(p_dict['date_of_birth'], "%Y-%m-%d"))
+        # Gender index
+        g_idx = 0 if p_dict['gender'] == 'M' else 1
+        new_gender = st.selectbox("Jenis Kelamin", ["M", "F"], index=g_idx)
+        new_mrn = st.text_input("No. Rekam Medis", value=p_dict.get('medical_record_number', ''))
+        
+        if st.form_submit_button("Simpan Perubahan", type="primary"):
+            db = SessionLocal()
+            try:
+                p_update = schemas.PatientCreate(
+                    full_name=new_name,
+                    date_of_birth=str(new_dob),
+                    gender=new_gender,
+                    medical_record_number=new_mrn if new_mrn else None
+                )
+                crud.update_patient(db, p_dict['id'], p_update)
+                st.toast("Data pasien diperbarui!", icon=":material/check_circle:")
+                time.sleep(1)
+                st.rerun()
+            except IntegrityError:
+                st.error(f"Nomor Rekam Medis '{new_mrn}' sudah terdaftar. Mohon gunakan nomor lain.", icon=":material/error:")
+            except Exception as e:
+                st.error(f"Gagal: {e}")
+            finally:
+                db.close()
+
+@st.dialog("Konfirmasi Hapus")
+def delete_patient_dialog(p_dict):
+    st.error(f"Apakah Anda yakin ingin menghapus data pasien **{p_dict['full_name']}**?", icon=":material/warning:")
+    st.warning("Tindakan ini tidak dapat dibatalkan. Semua riwayat pemeriksaan pasien ini juga akan dihapus.")
+    
+    col_yes, col_no = st.columns(2)
+    if col_yes.button("Ya, Hapus", type="primary", use_container_width=True):
+        db = SessionLocal()
+        try:
+            crud.delete_patient(db, p_dict['id'])
+            st.toast("Pasien dihapus.", icon=":material/delete:")
+            time.sleep(1)
+            st.rerun()
+        except Exception as e:
+            st.error(f"Gagal: {e}")
+        finally:
+            db.close()
+    
+    if col_no.button("Batal", use_container_width=True):
+        st.rerun()
+
+if menu == "Pasien":
     if not st.session_state.selected_patient:
-        st.info("Pilih pasien di sidebar.")
+        # --- Header ---
+        st.markdown("### :material/assignment_ind: Daftar Pasien")
+        
+        # --- Tools: Search & Filter ---
+        c_search, c_filter, c_limit = st.columns([3, 1, 1])
+        with c_search:
+            search_query = st.text_input("Cari Pasien (Nama / MRN)", placeholder="Ketik nama atau rekam medis...", label_visibility="collapsed")
+        with c_filter:
+            filter_gender = st.selectbox("Gender", ["Semua", "Laki-laki (M)", "Perempuan (F)"], label_visibility="collapsed")
+        with c_limit:
+            # Pagination Logic
+            if "patient_page" not in st.session_state: st.session_state.patient_page = 0
+            limit = 10
+            
+        # --- Data Fetching ---
+        db = SessionLocal()
+        offset = st.session_state.patient_page * limit
+        
+        # Base Query
+        query = db.query(models.Patient)
+        
+        # Apply Search
+        if search_query:
+            query = query.filter(
+                or_(
+                    models.Patient.full_name.contains(search_query),
+                    models.Patient.medical_record_number.contains(search_query)
+                )
+            )
+            
+        # Apply Filter
+        if filter_gender != "Semua":
+            g_code = "M" if "M" in filter_gender else "F"
+            query = query.filter(models.Patient.gender == g_code)
+            
+        # Count Total for Pagination
+        total_patients = query.count()
+        
+        # Apply Pagination
+        patients = query.order_by(models.Patient.id.desc()).offset(offset).limit(limit).all()
+        db.close()
+        
+        # --- Display Data ---
+        if patients:
+            # Stats Bar
+            st.caption(f"Menampilkan {len(patients)} dari {total_patients} pasien.")
+            
+            # Header
+            st.markdown("""
+            <div style="display: grid; grid-template-columns: 2fr 1fr 0.5fr 1.5fr; font-weight: bold; margin-bottom: 10px; padding: 10px; background-color: #f1f5f9; border-radius: 8px;">
+                <div>Nama Pasien</div>
+                <div>No. RM</div>
+                <div>Gender</div>
+                <div style="text-align: center;">Aksi</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            for p_obj in patients:
+                p = p_obj.__dict__
+                c1, c2, c3, c4 = st.columns([2, 1, 0.5, 1.5])
+                with c1: st.write(f"**{p['full_name']}**")
+                with c2: st.caption(p.get('medical_record_number', '-'))
+                with c3: st.write(f"**{p['gender']}**")
+                with c4: 
+                    b1, b2, b3 = st.columns([1, 1, 1])
+                    with b1:
+                        if st.button("", icon=":material/stethoscope:", key=f"btn_check_{p['id']}", help="Periksa Pasien", use_container_width=True):
+                            st.session_state.selected_patient = p
+                            st.rerun()
+                    with b2:
+                        if st.button("", icon=":material/edit:", key=f"btn_edit_{p['id']}", help="Edit Data", use_container_width=True):
+                            edit_patient_dialog(p)
+                    with b3:
+                        if st.button("", icon=":material/delete:", key=f"btn_del_{p['id']}", help="Hapus Pasien", type="primary", use_container_width=True):
+                            delete_patient_dialog(p)
+                            
+                st.markdown("<hr style='margin: 0.5rem 0; opacity: 0.3;'>", unsafe_allow_html=True)
+                
+            # --- Pagination Controls ---
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Helper to create numbered pagination
+            total_pages = (total_patients + limit - 1) // limit
+            current_page = st.session_state.patient_page
+            
+            # Show window of 5 pages
+            max_buttons = 5
+            start_page = max(0, min(current_page - max_buttons // 2, total_pages - max_buttons))
+            start_page = max(0, start_page)
+            end_page = min(start_page + max_buttons, total_pages)
+            
+            # Grid for buttons: Spacer + Prev + Numbers + Next + Spacer
+            # We use a ratio where the middle content is small and compacted
+            
+            num_pages_shown = end_page - start_page
+            
+            # Layout: [Spacer, Prev, p1, p2..., Next, Spacer]
+            # Center everything but give enough room for "Sebelumnya" (avoid wrap)
+            col_ratios = [3] + [2] + [0.7] * num_pages_shown + [2] + [3]
+            cols = st.columns(col_ratios)
+            
+            # Index tracker:
+            # 0=Spacer, 1=Prev, 2..=Pages, Last-1=Next, Last=Spacer
+            
+            # Prev (at index 1)
+            with cols[1]:
+                if st.button("Sebelumnya", icon=":material/chevron_left:", disabled=(current_page == 0), key="btn_prev_page"):
+                    st.session_state.patient_page -= 1
+                    st.rerun()
+                    
+            # Numbers (starting at index 2)
+            for i, p_idx in enumerate(range(start_page, end_page)):
+                with cols[i+2]:
+                    is_curr = (p_idx == current_page)
+                    label = str(p_idx + 1)
+                    # "primary" makes it stand out as active
+                    if st.button(label, key=f"btn_page_{p_idx}", type="primary" if is_curr else "secondary"):
+                        st.session_state.patient_page = p_idx
+                        st.rerun()
+                        
+            # Next (at last button position)
+            with cols[-2]:
+                if st.button("Berikutnya", icon=":material/chevron_right:", disabled=(current_page >= total_pages - 1), key="btn_next_page"):
+                    st.session_state.patient_page += 1
+                    st.rerun()
+                        
+        else:
+            st.info("Tidak ada data pasien yang cocok.")
+            if search_query or filter_gender != "Semua":
+                if st.button("Reset Pencarian"):
+                    st.rerun()
     else:
         p = st.session_state.selected_patient
         
-        # Header
+        # Navigation Header
+        st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+        if st.button("Kembali ke Daftar", icon=":material/arrow_back:"):
+            st.session_state.selected_patient = None
+            st.rerun()
+        
+        # Patient Card
         st.markdown(f"""
-        <div style="padding: 20px; background: white; border-radius: 10px; border-left: 5px solid #3b82f6;">
-            <h2>{p['full_name']}</h2>
-            <p>MRN: {p.get('medical_record_number', '-') or 'N/A'} | {p['gender']} | {p['date_of_birth']}</p>
+        <div style="padding: 20px; background: white; border-radius: 10px; border-left: 5px solid #3b82f6; margin-top: 10px;">
+            <h2 style="margin:0;">{p['full_name']}</h2>
+            <p style="margin:0; color: #64748b;">MRN: {p.get('medical_record_number', '-') or 'N/A'} | {p['gender']} | {p['date_of_birth']}</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -580,7 +790,44 @@ elif menu == "Pasien":
                         fig_map.update_layout(height=300, margin=dict(l=0,r=0,t=0,b=0), xaxis_title=None, yaxis_title=None)
                         st.plotly_chart(fig_map, use_container_width=True)
                 
-                st.info(f"Rekomendasi:\n{last['recommendations']}")
+                # --- Overall Risk Factors (All Time) ---
+                st.markdown("##### :material/history: Frekuensi Faktor Risiko (All Time)", unsafe_allow_html=True)
+                
+                # Logic to count risks across all history
+                total_visits = len(df_hist)
+                risk_counts = {
+                    "Hipertensi (>105 MAP)": df_hist[df_hist['map'] > 105].shape[0],
+                    "Obesitas (BMI>=30)": df_hist[df_hist['bmi'] >= 30].shape[0],
+                    "Diabetes (Gluc>=2)": df_hist[df_hist['gluc'] >= 2].shape[0],
+                    "Kol Tinggi (Chol>=2)": df_hist[df_hist['cholesterol'] >= 2].shape[0],
+                    "Perokok": df_hist[df_hist['smoke'] == 1].shape[0]
+                }
+                
+                df_risks = pd.DataFrame(list(risk_counts.items()), columns=["Faktor", "Jumlah"])
+                df_risks['Persentase'] = (df_risks['Jumlah'] / total_visits * 100).round(1)
+                df_risks = df_risks.sort_values("Jumlah", ascending=True)
+
+                fig_overall = px.bar(
+                    df_risks, 
+                    x="Jumlah", 
+                    y="Faktor", 
+                    orientation='h',
+                    text="Jumlah",
+                    hover_data=["Persentase"],
+                    color="Jumlah",
+                    color_continuous_scale="Reds"
+                )
+                fig_overall.update_layout(
+                    height=300, 
+                    margin=dict(l=0, r=0, t=10, b=0),
+                    xaxis_title="Frekuensi Kejadian",
+                    yaxis_title=None,
+                    showlegend=False
+                )
+                fig_overall.update_traces(textposition='outside')
+                st.plotly_chart(fig_overall, use_container_width=True)
+
+                st.info(f"Rekomendasi Terakhir:\n{last['recommendations']}")
             else:
                 st.info("Belum ada data.")
                 
@@ -619,8 +866,8 @@ elif menu == "Pasien":
                         res = perform_analysis(p, age, bmi, map_val, chol_map, gluc_map, chol, gluc, smoke, alco, active)
                         
                         if res:
-                            st.toast("Analisis Selesai!", icon="✅")
-                            st.markdown("### 📊 Hasil Analisis")
+                            st.toast("Analisis Selesai!", icon=":material/check_circle:")
+                            st.markdown("### :material/analytics: Hasil Analisis")
                             
                             # Row 1: Main Visuals (Gauge & Radar)
                             r1, r2 = st.columns(2)
@@ -667,7 +914,8 @@ elif menu == "Pasien":
                                     except:
                                         pass
                                 
-                            st.button("🔄 Reset / Analisis Ulang", on_click=lambda: st.rerun())
+                            if st.button("Reset / Analisis Ulang", icon=":material/refresh:", type="secondary", use_container_width=True):
+                                st.rerun()
 
         with tab3:
             if not df_hist.empty:
@@ -678,7 +926,7 @@ elif menu == "Pasien":
                 fname = f"HEARTREPORT_{safe_name}_{safe_mrn}_{date_str}_.csv"
                 
                 csv = df_hist.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Unduh Riwayat Pasien (.csv)", csv, fname, "text/csv", type="primary")
+                st.download_button("Unduh Riwayat Pasien (.csv)", csv, fname, "text/csv", icon=":material/download:", type="primary")
                 
                 # Clean dataframe for display
                 display_cols = ['created_at', 'risk_category', 'probability', 'bmi', 'map', 'recommendations']
