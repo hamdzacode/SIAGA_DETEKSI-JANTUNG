@@ -431,25 +431,33 @@ with st.sidebar:
                 new_mrn = st.text_input("No. Rekam Medis (Opsional)")
                 
                 if st.form_submit_button("Simpan Data", type="primary"):
-                    db = SessionLocal()
-                    try:
-                        p_create = schemas.PatientCreate(
-                            full_name=new_name,
-                            date_of_birth=str(new_dob),
-                            gender=new_gender,
-                            medical_record_number=new_mrn if new_mrn else None
-                        )
-                        new_p = crud.create_patient(db, p_create)
-                        st.session_state.selected_patient = new_p.__dict__
-                        st.toast("Pasien berhasil didaftarkan!", icon=":material/check_circle:")
-                        time.sleep(1)
-                        st.rerun()
-                    except IntegrityError:
-                        st.error(f"Nomor Rekam Medis '{new_mrn}' sudah terdaftar. Mohon gunakan nomor lain.", icon=":material/error:")
-                    except Exception as e:
-                        st.error(f"Gagal: {e}")
-                    finally:
-                        db.close()
+                    # VALIDASI UMUR REGISTRASI
+                    birth_date = new_dob
+                    today = datetime.now().date()
+                    age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+                    
+                    if not (15 <= age <= 100):
+                         st.error(f"❌ **Umur Tidak Valid ({age} th)**: Pasien baru wajib berusia 15-100 tahun untuk dapat didaftarkan di sistem ini. Silakan cek Tanggal Lahir.", icon=":material/block:")
+                    else:
+                        db = SessionLocal()
+                        try:
+                            p_create = schemas.PatientCreate(
+                                full_name=new_name,
+                                date_of_birth=str(new_dob),
+                                gender=new_gender,
+                                medical_record_number=new_mrn if new_mrn else None
+                            )
+                            new_p = crud.create_patient(db, p_create)
+                            st.session_state.selected_patient = new_p.__dict__
+                            st.toast("Pasien berhasil didaftarkan!", icon=":material/check_circle:")
+                            time.sleep(1)
+                            st.rerun()
+                        except IntegrityError:
+                            st.error(f"Nomor Rekam Medis '{new_mrn}' sudah terdaftar. Mohon gunakan nomor lain.", icon=":material/error:")
+                        except Exception as e:
+                            st.error(f"Gagal: {e}")
+                        finally:
+                            db.close()
 
     st.markdown("<div style='margin-top: 50px;'></div>", unsafe_allow_html=True)
     if st.button("Logout", type="secondary"):
@@ -854,8 +862,35 @@ if menu == "Pasien":
                 submitted = st.form_submit_button("Analisis", type="primary")
             
             if submitted:
-                if age < 5:
-                    st.error("Pasien terlalu muda.")
+                # --- strict VALIDATION LAYER ---
+                errors = []
+
+                # 1. Validasi Umur (15 - 100)
+                # KOREKSI USER: Rentang 15-100 tahun
+                if not (15 <= age <= 100):
+                    errors.append(f"⚠️ **Umur Error ({age} th)**: Model AI ini dikalibrasi untuk rentang usia 15-100 tahun. Data anak-anak (<15) atau lansia ekstrem (>100) memiliki profil fisiologis berbeda yang tidak dapat diprediksi akurat oleh sistem ini.")
+
+                # 2. Validasi Tensi (Darah Rendah/Tinggi Wajar & Pulse Pressure)
+                if sys_bp <= dia_bp:
+                    errors.append("⚠️ **Tensi Error**: Nilai Sistolik harus lebih besar dari Diastolik. Mohon cek kembali alat ukur Anda.")
+                if not (70 <= sys_bp <= 250):
+                    errors.append(f"⚠️ **Sistolik Anomali ({sys_bp} mmHg)**: Nilai di luar batas wajar (70-250). Jika ini benar, pasien membutuhkan penanganan darurat segera, bukan prediksi AI.")
+                if not (40 <= dia_bp <= 150):
+                    errors.append(f"⚠️ **Diastolik Anomali ({dia_bp} mmHg)**: Nilai di luar batas wajar (40-150). Mohon periksa kembali input Anda.")
+                
+                # Pulse Pressure (Tekanan Nadi) Check -> (Sys - Dia) jgn terlalu kecil/besar
+                if (sys_bp - dia_bp) < 20: 
+                    errors.append(f"⚠️ **Pulse Pressure Sempit ({sys_bp-dia_bp} mmHg)**: Selisih Sistolik & Diastolik < 20 mmHg mengindikasikan kesalahan pengukuran atau kondisi syok yang tidak valid untuk prediksi rutin.")
+
+                # 3. Validasi Fisik
+                if not (120 <= h <= 210):
+                    errors.append(f"⚠️ **Tinggi Badan ({h} cm)**: Input di luar rentang valid model (120-210 cm). Tinggi ekstrem mempengaruhi perhitungan BMI dan validitas prediksi jantung.")
+                if not (25 <= w <= 250):
+                    errors.append(f"⚠️ **Berat Badan ({w} kg)**: Input di luar rentang valid (25-250 kg). Mohon pastikan satuan adalah Kilogram (kg). DATA EKSTRIM MEMENGARUHI VALIDITAS.")
+
+                if errors:
+                    for e in errors:
+                        st.error(e)
                 else:
                     with st.spinner("Menganalisis..."):
                         bmi = w / ((h/100)**2)
@@ -869,43 +904,37 @@ if menu == "Pasien":
                             st.toast("Analisis Selesai!", icon=":material/check_circle:")
                             st.markdown("### :material/analytics: Hasil Analisis")
                             
-                            # Row 1: Main Visuals (Gauge & Radar)
+                            # Row 1: Main Visuals
                             r1, r2 = st.columns(2)
                             with r1:
-                                # 1. GAUGE CHART (Risk Probability)
                                 prob_val = res['probability'] * 100
                                 st.plotly_chart(create_gauge_chart(prob_val, "Probabilitas Risiko"), use_container_width=True)
                                 st.caption(f"Status: **{res['risk_category']}**")
                                 
                             with r2:
-                                # 2. RADAR CHART (Risk Profile)
-                                # Reconstruct input data for visualization
                                 radar_input = {
                                     "bmi": bmi,
                                     "map": map_val,
-                                    "cholesterol": chol_map[chol], # 1, 2, 3
-                                    "gluc": gluc_map[gluc],       # 1, 2, 3
+                                    "cholesterol": chol_map[chol],
+                                    "gluc": gluc_map[gluc],
                                     "smoke": int(smoke),
                                     "alco": int(alco),
                                     "active": int(active)
                                 }
                                 st.plotly_chart(create_radar_chart(radar_input), use_container_width=True)
 
-                            # Row 2: Recommendations & Explanation
+                            # Row 2: Recs
                             st.markdown("#### Rekomendasi Medis")
                             st.info(res['recommendations'])
                             
-                            # Row 3: Detail SHAP (Expandable)
+                            # Row 3: SHAP
                             if res.get('shap_values'):
                                 with st.expander("Lihat Detail Faktor Penentu (AI Explanation)"):
                                     try:
                                         shap_data = json.loads(res['shap_values'])
                                         if shap_data:
-                                            # Sort by absolute impact
                                             sorted_shap = sorted(shap_data.items(), key=lambda x: abs(x[1]), reverse=True)
-                                            # Convert to DF for chart
                                             shap_df = pd.DataFrame(sorted_shap, columns=['Faktor', 'Impact'])
-                                            
                                             fig_shap = px.bar(shap_df, x='Impact', y='Faktor', orientation='h',
                                                             title="Kontribusi Faktor Risiko (SHAP)",
                                                             color='Impact', color_continuous_scale=['#2ecc71', '#e74c3c'])
@@ -913,9 +942,6 @@ if menu == "Pasien":
                                             st.plotly_chart(fig_shap, use_container_width=True)
                                     except:
                                         pass
-                                
-                            if st.button("Reset / Analisis Ulang", icon=":material/refresh:", type="secondary", use_container_width=True):
-                                st.rerun()
 
         with tab3:
             if not df_hist.empty:
